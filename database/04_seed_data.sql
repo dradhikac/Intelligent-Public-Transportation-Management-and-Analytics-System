@@ -1,4 +1,5 @@
 
+
 -- =====================================================
 -- TransitIQ: OPERATIONAL DATA GENERATION
 -- PART A: FLEET, DRIVERS, ROUTES AND STOPS

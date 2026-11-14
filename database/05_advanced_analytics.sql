@@ -112,7 +112,7 @@ SELECT
         WHEN lbm.next_service_date IS NULL THEN 'NO SCHEDULED DATE'
         WHEN lbm.next_service_date < CURRENT_DATE THEN 'OVERDUE'
         WHEN lbm.next_service_date = CURRENT_DATE THEN 'DUE TODAY'
-        WHEN lbm.next_service_date <= CURRENT_DATE + INTERVAL '14 days' THEN 'DUE SOON (Within 14 Days)'
+        WHEN lbm.next_service_date <= CURRENT_DATE + 14 THEN 'DUE SOON (Within 14 Days)'
         ELSE 'UPCOMING'
     END AS maintenance_urgency
 FROM latest_bus_maintenance lbm
@@ -121,7 +121,7 @@ ORDER BY
     CASE
         WHEN lbm.next_service_date < CURRENT_DATE THEN 1
         WHEN lbm.next_service_date = CURRENT_DATE THEN 2
-        WHEN lbm.next_service_date <= CURRENT_DATE + INTERVAL '14 days' THEN 3
+        WHEN lbm.next_service_date <= CURRENT_DATE + 14 THEN 3
         WHEN lbm.next_service_date IS NULL THEN 5
         ELSE 4
     END,
@@ -452,21 +452,9 @@ SELECT
     t.service_date,
     TO_CHAR(t.service_date, 'Day') AS day_of_week,
     COUNT(dr.delay_id) AS total_delays_logged,
-    COUNT(
-        CASE
-            WHEN dr.severity = 'MINOR' OR dr.delay_seconds <= 300 THEN 1
-        END
-    ) AS minor_delays,
-    COUNT(
-        CASE
-            WHEN dr.severity = 'MODERATE' OR (dr.delay_seconds > 300 AND dr.delay_seconds <= 600) THEN 1
-        END
-    ) AS moderate_delays,
-    COUNT(
-        CASE
-            WHEN dr.severity = 'SEVERE' OR dr.delay_seconds > 600 THEN 1
-        END
-    ) AS severe_delays,
+    COUNT(CASE WHEN dr.severity = 'MINOR' THEN 1 END) AS minor_delays,
+    COUNT(CASE WHEN dr.severity = 'MODERATE' THEN 1 END) AS moderate_delays,
+    COUNT(CASE WHEN dr.severity = 'SEVERE' THEN 1 END) AS severe_delays,
     ROUND(COALESCE(AVG(dr.delay_seconds), 0) / 60.0, 2) AS avg_delay_minutes_per_event,
     ROUND(COALESCE(SUM(dr.delay_seconds), 0) / 3600.0, 2) AS total_delay_hours
 FROM trips t
@@ -489,7 +477,7 @@ ORDER BY t.service_date ASC;
 SELECT
     d.driver_id,
     d.employee_code,
-    (d.first_name || ' ' || COALESCE(d.last_name, '')) AS driver_full_name,
+    CONCAT_WS(' ', d.first_name, d.last_name) AS driver_full_name,
     d.status AS driver_status,
     COUNT(t.trip_id) AS total_assigned_trips,
     COUNT(CASE WHEN t.trip_status = 'COMPLETED' THEN 1 END) AS completed_trips,
@@ -517,7 +505,7 @@ SELECT
     ) AS productivity_rank,
     d.driver_id,
     d.employee_code,
-    (d.first_name || ' ' || COALESCE(d.last_name, '')) AS driver_full_name,
+    CONCAT_WS(' ', d.first_name, d.last_name) AS driver_full_name,
     d.date_of_joining,
     COUNT(CASE WHEN t.trip_status = 'COMPLETED' THEN 1 END) AS completed_trips,
     ROUND(
@@ -540,7 +528,7 @@ ORDER BY productivity_rank ASC, d.employee_code ASC;
 SELECT
     d.driver_id,
     d.employee_code,
-    (d.first_name || ' ' || COALESCE(d.last_name, '')) AS driver_full_name,
+    CONCAT_WS(' ', d.first_name, d.last_name) AS driver_full_name,
     d.phone_number,
     d.license_number,
     d.license_expiry_date,

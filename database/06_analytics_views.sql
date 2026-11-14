@@ -183,7 +183,7 @@ SELECT
 FROM routes r
 JOIN route_stops rs ON r.route_id = rs.route_id
 JOIN stops s ON rs.stop_id = s.stop_id
-LEFT JOIN trip_stop_logs tsl ON rs.route_stop_id = tsl.route_stop_id
+LEFT JOIN trip_stop_logs tsl ON rs.route_stop_id = tsl.route_stop_id AND rs.route_id = tsl.route_id
 LEFT JOIN passenger_counts pc ON tsl.trip_stop_log_id = pc.trip_stop_log_id
 GROUP BY
     r.route_id,
@@ -212,7 +212,7 @@ SELECT
     b.bus_id,
     b.registration_number AS bus_registration,
     d.driver_id,
-    (d.first_name || ' ' || COALESCE(d.last_name, '')) AS driver_name,
+    CONCAT_WS(' ', d.first_name, d.last_name) AS driver_name,
     s.stop_id,
     s.stop_name,
     rs.stop_sequence,
@@ -271,7 +271,7 @@ driver_delay_stats AS (
 SELECT
     d.driver_id,
     d.employee_code,
-    (d.first_name || ' ' || COALESCE(d.last_name, '')) AS driver_full_name,
+    CONCAT_WS(' ', d.first_name, d.last_name) AS driver_full_name,
     d.phone_number,
     d.status AS driver_status,
     d.license_number,
@@ -301,3 +301,9 @@ LEFT JOIN driver_delay_stats dds ON d.driver_id = dds.driver_id;
 -- =====================================================================
 -- END OF ANALYTICAL VIEWS
 -- =====================================================================
+
+SELECT * FROM vw_fleet_summary LIMIT 5;
+        SELECT * FROM vw_route_performance LIMIT 5;
+        SELECT * FROM vw_passenger_demand LIMIT 5;
+        SELECT * FROM vw_delay_analysis LIMIT 5;
+        SELECT * FROM vw_driver_performance LIMIT 5;
