@@ -128,7 +128,7 @@ ORDER BY pg_relation_size(ui.indexrelid) DESC;
 
 
 -- =====================================================================
--- 7. DATABASE TRANSACTION COMMIT VS ROLLBACK HEALTH (pg_database)
+-- 7. DATABASE TRANSACTION COMMIT VS ROLLBACK HEALTH (pg_stat_database)
 -- Purpose: Ensure rollback rates remain < 1-2% of total transaction volume.
 -- =====================================================================
 SELECT
@@ -140,7 +140,7 @@ SELECT
         3
     ) AS rollback_ratio_pct,
     pg_size_pretty(pg_database_size(datname)) AS total_database_size
-FROM pg_database
+FROM pg_stat_database
 WHERE datname = current_database();
 
 
