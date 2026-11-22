@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TransitIQ - Intelligent Public Transportation Management & Analytics</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet.js CSS & JS CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 p-2 rounded-lg text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <i data-lucide="bus" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h1 class="text-xl font-bold tracking-tight text-white">TransitIQ</h1>
+                    <span class="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded font-mono">v1.0.0</span>
+                </div>
+                <p class="text-xs text-slate-400">Intelligent Transportation Management & Analytics System</p>
+            </div>
+        </div>
+
+        <!-- System Status & Quick Actions -->
+        <div class="flex items-center space-x-4">
+            <div id="db-status-badge" class="flex items-center space-x-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full text-xs">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="db-status-text" class="text-slate-300 font-mono">Checking DB...</span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="openDispatchModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>Dispatch Trip</span>
+                </button>
+                <button onclick="openDelayModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                    <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                    <span>Log Delay</span>
+                </button>
+                <button onclick="openPassengerModal()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>Record Footfall</span>
+                </button>
+                <button onclick="refreshCurrentView()" title="Refresh Data" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition">
+                    <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Application Shell -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-slate-900/80 border-r border-slate-800 flex flex-col justify-between p-4 space-y-6">
+            <nav class="space-y-1.5">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-white bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 transition">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span>Executive Overview</span>
+                </button>
+                <button onclick="switchTab('fleet')" id="nav-fleet" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition">
+                    <i data-lucide="truck" class="w-4 h-4"></i>
+                    <span>Fleet & Maintenance</span>
+                </button>
+                <button onclick="switchTab('routes')" id="nav-routes" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition">
+                    <i data-lucide="map" class="w-4 h-4"></i>
+                    <span>Live Map & Routes</span>
+                </button>
+                <button onclick="switchTab('trips')" id="nav-trips" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition">
+                    <i data-lucide="navigation" class="w-4 h-4"></i>
+                    <span>Trip Dispatch Center</span>
+                </button>
+                <button onclick="switchTab('passengers')" id="nav-passengers" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>Passenger Footfall</span>
+                </button>
+                <button onclick="switchTab('delays')" id="nav-delays" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition">
+                    <i data-lucide="clock" class="w-4 h-4"></i>
+                    <span>Delays & Punctuality</span>
+                </button>
+                <button onclick="switchTab('drivers')" id="nav-drivers" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition">
+                    <i data-lucide="user-check" class="w-4 h-4"></i>
+                    <span>Drivers & Compliance</span>
+                </button>
+                <button onclick="switchTab('audit')" id="nav-audit" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    <span>Security Audit Logs</span>
+                </button>
+            </nav>
+
+            <!-- Server & Environment Card -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3 text-xs text-slate-400 space-y-1 font-mono">
+                <div class="flex justify-between">
+                    <span>Engine:</span>
+                    <span class="text-slate-200">PostgreSQL 18</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Database:</span>
+                    <span class="text-indigo-400 font-semibold">transitiq_db</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Port:</span>
+                    <span class="text-slate-200">5432</span>
+                </div>
+                <div class="flex justify-between pt-1 border-t border-slate-800/80">
+                    <span>API Docs:</span>
+                    <a href="/docs" target="_blank" class="text-indigo-400 hover:underline">/docs &nearr;</a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content View Area -->
+        <main class="flex-1 overflow-y-auto p-6 bg-slate-950">
+
+            <!-- TAB 1: EXECUTIVE OVERVIEW DASHBOARD -->
+            <section id="view-dashboard" class="tab-content space-y-6">
+                <!-- Top KPI Stat Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-cards-grid">
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                            <span>Fleet Assets</span>
+                            <i data-lucide="bus" class="w-4 h-4 text-indigo-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span class="text-3xl font-extrabold text-white" id="kpi-total-buses">--</span>
+                            <span class="text-xs text-emerald-400 font-medium" id="kpi-active-buses">-- Active</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Active vs in-depot maintenance</p>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                            <span>Operational Trips</span>
+                            <i data-lucide="navigation" class="w-4 h-4 text-blue-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span class="text-3xl font-extrabold text-white" id="kpi-total-trips">--</span>
+                            <span class="text-xs text-blue-400 font-medium" id="kpi-running-trips">-- Running</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Scheduled & live transit runs</p>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                            <span>Passenger Footfall</span>
+                            <i data-lucide="users" class="w-4 h-4 text-emerald-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span class="text-3xl font-extrabold text-white" id="kpi-total-passengers">--</span>
+                            <span class="text-xs text-slate-400 font-medium">Boardings</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Cumulative corridor volume</p>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                            <span>Punctuality Rate</span>
+                            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-2">
+                            <span class="text-3xl font-extrabold text-white" id="kpi-on-time-rate">--%</span>
+                            <span class="text-xs text-rose-400 font-medium" id="kpi-severe-delays">-- Severe Delays</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Schedule adherence SLA</p>
+                    </div>
+                </div>
+
+                <!-- Visual Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="stat-card">
+                        <h3 class="text-sm font-semibold text-slate-200 mb-4 flex items-center justify-between">
+                            <span>Fleet Availability & Composition</span>
+                            <span class="text-xs text-slate-400 font-mono">vw_fleet_summary</span>
+                        </h3>
+                        <div class="h-64 flex items-center justify-center">
+                            <canvas id="chart-fleet-availability"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3 class="text-sm font-semibold text-slate-200 mb-4 flex items-center justify-between">
+                            <span>Corridor Passenger Demand & Footfall</span>
+                            <span class="text-xs text-slate-400 font-mono">vw_passenger_demand</span>
+                        </h3>
+                        <div class="h-64 flex items-center justify-center">
+                            <canvas id="chart-passenger-demand"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Operational Trips & Delay Incidents -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 stat-card overflow-hidden">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-semibold text-slate-200 flex items-center space-x-2">
+                                <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i>
+                                <span>Recent Transit Trips & Dispatch Events</span>
+                            </h3>
+                            <button onclick="switchTab('trips')" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">View All &rarr;</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Trip ID</th>
+                                        <th>Route</th>
+                                        <th>Bus No.</th>
+                                        <th>Driver</th>
+                                        <th>Service Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="overview-trips-tbody">
+                                    <tr><td colspan="6" class="text-center text-slate-500 py-6">Loading trips...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3 class="text-sm font-semibold text-slate-200 mb-4 flex items-center space-x-2">
+                            <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400"></i>
+                            <span>Recent Delay Alerts</span>
+                        </h3>
+                        <div id="overview-delays-list" class="space-y-3">
+                            <div class="text-xs text-slate-500 text-center py-6">Loading alerts...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 2: FLEET MANAGEMENT -->
+            <section id="view-fleet" class="tab-content hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Fleet Asset Management</h2>
+                        <p class="text-xs text-slate-400">Vehicle health, capacity profiles, and depot maintenance tracking</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <select id="fleet-filter-status" onchange="loadFleetTab()" class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500">
+                            <option value="">All Statuses</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="MAINTENANCE">In Maintenance</option>
+                            <option value="INACTIVE">Inactive</option>
+                            <option value="RETIRED">Retired</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Bus Inventory Table -->
+                <div class="stat-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Bus ID</th>
+                                    <th>Reg Number</th>
+                                    <th>Type</th>
+                                    <th>Make & Model</th>
+                                    <th>Total Capacity</th>
+                                    <th>Status</th>
+                                    <th>Last Service</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fleet-buses-tbody">
+                                <tr><td colspan="8" class="text-center text-slate-500 py-6">Loading buses...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Maintenance Records Table -->
+                <div class="stat-card overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-slate-200 flex items-center space-x-2">
+                            <i data-lucide="wrench" class="w-4 h-4 text-rose-400"></i>
+                            <span>Depot Maintenance Work Orders</span>
+                        </h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Bus Reg.</th>
+                                    <th>Type</th>
+                                    <th>Service Date</th>
+                                    <th>Next Scheduled</th>
+                                    <th>Cost (Rs)</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fleet-maintenance-tbody">
+                                <tr><td colspan="8" class="text-center text-slate-500 py-6">Loading maintenance records...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 3: LIVE MAP & ROUTES -->
+            <section id="view-routes" class="tab-content hidden space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Transit Network & Geographic Stops</h2>
+                    <p class="text-xs text-slate-400">Interactive corridor mapping, stop sequencing, and distance matrices</p>
+                </div>
+
+                <!-- Leaflet Map Container -->
+                <div class="stat-card p-3">
+                    <div id="transit-map"></div>
+                </div>
+
+                <!-- Routes Table -->
+                <div class="stat-card overflow-hidden">
+                    <h3 class="text-sm font-semibold text-slate-200 mb-4">Transit Corridors & Performance (vw_route_performance)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Route</th>
+                                    <th>Route Name</th>
+                                    <th>Terminal Origin</th>
+                                    <th>Terminal Destination</th>
+                                    <th>Distance</th>
+                                    <th>Total Trips</th>
+                                    <th>Completed</th>
+                                    <th>Completion %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="routes-tbody">
+                                <tr><td colspan="8" class="text-center text-slate-500 py-6">Loading routes...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 4: TRIP OPERATIONS & DISPATCH -->
+            <section id="view-trips" class="tab-content hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Trip Dispatch Center</h2>
+                        <p class="text-xs text-slate-400">Live operational timetable execution, vehicle pairings, and stop logs</p>
+                    </div>
+                    <button onclick="openDispatchModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        <span>Dispatch Trip (sp_create_trip)</span>
+                    </button>
+                </div>
+
+                <!-- Trips Table -->
+                <div class="stat-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Trip ID</th>
+                                    <th>Route</th>
+                                    <th>Bus Reg</th>
+                                    <th>Driver</th>
+                                    <th>Service Date</th>
+                                    <th>Scheduled Start</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trips-tbody">
+                                <tr><td colspan="8" class="text-center text-slate-500 py-6">Loading trips...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 5: PASSENGER DEMAND -->
+            <section id="view-passengers" class="tab-content hidden space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Passenger Telemetry & Footfall Analytics</h2>
+                    <p class="text-xs text-slate-400">Stop-level boardings, alightings, corridor density, and revenue insights</p>
+                </div>
+
+                <div class="stat-card overflow-hidden">
+                    <h3 class="text-sm font-semibold text-slate-200 mb-4">Stop-Wise Passenger Footfall (vw_passenger_demand)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Route</th>
+                                    <th>Stop Name</th>
+                                    <th>Sequence</th>
+                                    <th>Scheduled Visits</th>
+                                    <th>Boardings</th>
+                                    <th>Alightings</th>
+                                    <th>Total Footfall</th>
+                                    <th>Avg / Visit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="passengers-demand-tbody">
+                                <tr><td colspan="8" class="text-center text-slate-500 py-6">Loading passenger demand...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 6: DELAYS & PUNCTUALITY -->
+            <section id="view-delays" class="tab-content hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Delay Incidents & Root Cause Analysis</h2>
+                        <p class="text-xs text-slate-400">Trigger-classified incident severity (MINOR, MODERATE, SEVERE)</p>
+                    </div>
+                    <button onclick="openDelayModal()" class="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        <span>Log Delay Incident</span>
+                    </button>
+                </div>
+
+                <div class="stat-card overflow-hidden">
+                    <h3 class="text-sm font-semibold text-slate-200 mb-4">Historical Delay Records (vw_delay_analysis)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Service Date</th>
+                                    <th>Trip ID</th>
+                                    <th>Route</th>
+                                    <th>Stop</th>
+                                    <th>Reason</th>
+                                    <th>Delay (Seconds)</th>
+                                    <th>Severity</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="delays-tbody">
+                                <tr><td colspan="9" class="text-center text-slate-500 py-6">Loading delay analysis...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 7: DRIVERS & COMPLIANCE -->
+            <section id="view-drivers" class="tab-content hidden space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Driver Personnel & Regulatory Compliance</h2>
+                    <p class="text-xs text-slate-400">License expiry audits (fn_check_license_expiry) and performance scoring</p>
+                </div>
+
+                <div class="stat-card overflow-hidden">
+                    <h3 class="text-sm font-semibold text-slate-200 mb-4">Driver Directory & Expiry Status</h3>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Emp Code</th>
+                                    <th>Driver Name</th>
+                                    <th>Phone</th>
+                                    <th>License Number</th>
+                                    <th>Expiry Date</th>
+                                    <th>License Status</th>
+                                    <th>Duty Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drivers-tbody">
+                                <tr><td colspan="8" class="text-center text-slate-500 py-6">Loading drivers...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 8: AUDIT TRAIL -->
+            <section id="view-audit" class="tab-content hidden space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Immutable Security Audit Trail</h2>
+                    <p class="text-xs text-slate-400">Captured via PostgreSQL trigger fn_audit_changes() across DML events</p>
+                </div>
+
+                <div class="stat-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Audit ID</th>
+                                    <th>Table Name</th>
+                                    <th>Record ID</th>
+                                    <th>Operation</th>
+                                    <th>Changed By</th>
+                                    <th>Timestamp</th>
+                                    <th>JSONB Delta</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-tbody">
+                                <tr><td colspan="7" class="text-center text-slate-500 py-6">Loading audit records...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL 1: DISPATCH NEW TRIP -->
+    <div id="modal-dispatch" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="navigation" class="w-5 h-5 text-indigo-400"></i>
+                    <span>Dispatch New Trip (sp_create_trip)</span>
+                </h3>
+                <button onclick="closeModal('modal-dispatch')" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <form id="form-dispatch" onsubmit="handleDispatchTrip(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Route & Schedule</label>
+                    <select id="dispatch-schedule-select" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <option value="">Select Schedule...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Assigned Bus (Active)</label>
+                    <select id="dispatch-bus-select" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <option value="">Select Bus...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Assigned Driver (Available)</label>
+                    <select id="dispatch-driver-select" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <option value="">Select Driver...</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Service Date</label>
+                        <input type="date" id="dispatch-service-date" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Scheduled Start Time</label>
+                        <input type="time" id="dispatch-start-time" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button type="button" onclick="closeModal('modal-dispatch')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white">Execute Dispatch</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: LOG DELAY INCIDENT -->
+    <div id="modal-delay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400"></i>
+                    <span>Log Service Delay (sp_record_delay)</span>
+                </h3>
+                <button onclick="closeModal('modal-delay')" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <form id="form-delay" onsubmit="handleRecordDelay(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Trip Stop Log ID</label>
+                    <input type="number" id="delay-stop-log-id" required placeholder="e.g. 1" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Delay Reason</label>
+                    <select id="delay-reason-select" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <option value="">Select Reason...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Delay Duration (Seconds)</label>
+                    <input type="number" id="delay-seconds-input" required min="1" placeholder="e.g. 300" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                    <p class="text-[10px] text-slate-500 mt-0.5">Trigger auto-classifies: &lt;300s = MINOR, 300-600s = MODERATE, &gt;600s = SEVERE</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Remarks</label>
+                    <textarea id="delay-remarks-input" rows="2" placeholder="Traffic congestion near bridge..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200"></textarea>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button type="button" onclick="closeModal('modal-delay')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white">Log Incident</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: RECORD PASSENGER FOOTFALL -->
+    <div id="modal-passenger" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="users" class="w-5 h-5 text-emerald-400"></i>
+                    <span>Record Passenger Count (sp_record_passenger_count)</span>
+                </h3>
+                <button onclick="closeModal('modal-passenger')" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <form id="form-passenger" onsubmit="handleRecordPassenger(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Trip Stop Log ID</label>
+                    <input type="number" id="pass-stop-log-id" required placeholder="e.g. 1" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Boarding Count</label>
+                        <input type="number" id="pass-boarding-input" required min="0" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Alighting Count</label>
+                        <input type="number" id="pass-alighting-input" required min="0" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button type="button" onclick="closeModal('modal-passenger')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white">Record Footfall</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: JSONB DATA VIEWER -->
+    <div id="modal-json" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="code" class="w-5 h-5 text-indigo-400"></i>
+                    <span id="json-modal-title">Audit Record Delta</span>
+                </h3>
+                <button onclick="closeModal('modal-json')" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <pre id="json-modal-content" class="bg-slate-950 p-4 rounded-lg font-mono text-xs text-emerald-400 max-h-96 overflow-y-auto border border-slate-800"></pre>
+            <div class="flex justify-end">
+                <button onclick="closeModal('modal-json')" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-white hover:bg-slate-700">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <!-- Frontend JavaScript -->
+    <script src="/static/app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
