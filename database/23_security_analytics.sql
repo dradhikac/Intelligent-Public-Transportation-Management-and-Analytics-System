@@ -89,14 +89,17 @@ ORDER BY view_name, grantee;
 -- Purpose: Verify least-privilege routine execution grants.
 -- =====================================================================
 SELECT
-    routine_name,
-    routine_type,
-    grantee,
-    privilege_type
-FROM information_schema.routine_privileges
-WHERE specific_schema = 'public'
-  AND grantee IN ('transit_admin', 'transit_dispatcher', 'transit_fleet_manager', 'transit_analyst', 'transit_auditor')
-ORDER BY routine_name, grantee;
+    rp.routine_name,
+    r.routine_type,
+    rp.grantee,
+    rp.privilege_type
+FROM information_schema.routine_privileges rp
+JOIN information_schema.routines r
+  ON rp.specific_name = r.specific_name
+ AND rp.specific_schema = r.specific_schema
+WHERE rp.specific_schema = 'public'
+  AND rp.grantee IN ('transit_admin', 'transit_dispatcher', 'transit_fleet_manager', 'transit_analyst', 'transit_auditor')
+ORDER BY rp.routine_name, rp.grantee;
 
 
 -- =====================================================================
