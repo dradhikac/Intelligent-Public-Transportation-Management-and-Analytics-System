@@ -610,11 +610,17 @@ DO $$
 DECLARE
     v_bus_id BIGINT;
     v_maint_id BIGINT;
+    v_orig_last_service DATE;
     v_audit_count INTEGER;
-    v_new_last_service DATE;
+    v_check_date DATE;
 BEGIN
-    SELECT b.bus_id INTO v_bus_id FROM buses b WHERE b.status = 'ACTIVE' LIMIT 1;
+    SELECT b.bus_id, b.last_service_date
+    INTO v_bus_id, v_orig_last_service
+    FROM buses b
+    WHERE b.status = 'ACTIVE'
+    LIMIT 1;
 
+    -- 1. Insert COMPLETED record with future/current date
     INSERT INTO maintenance_records (
         bus_id, maintenance_type, description,
         maintenance_date, next_service_date, maintenance_cost, maintenance_status
@@ -625,7 +631,7 @@ BEGIN
     )
     RETURNING maintenance_id INTO v_maint_id;
 
-    -- Verify audit log
+    -- Verify audit log entry
     SELECT COUNT(*) INTO v_audit_count
     FROM audit_logs
     WHERE table_name = 'maintenance_records'
@@ -637,19 +643,38 @@ BEGIN
     END IF;
 
     -- Verify maintenance sync trigger updated buses.last_service_date
-    SELECT b.last_service_date INTO v_new_last_service
-    FROM buses b
-    WHERE b.bus_id = v_bus_id;
+    SELECT b.last_service_date INTO v_check_date
+    FROM buses b WHERE b.bus_id = v_bus_id;
 
-    IF v_new_last_service <> CURRENT_DATE THEN
+    IF v_check_date <> CURRENT_DATE THEN
         RAISE EXCEPTION 'TEST 15 FAILED: Bus last_service_date not synced to %', CURRENT_DATE;
     END IF;
 
-    -- Cleanup
+    -- 2. Verify Reversal: update to PENDING should recalculate back to previous max
+    UPDATE maintenance_records
+    SET maintenance_status = 'PENDING'
+    WHERE maintenance_id = v_maint_id;
+
+    SELECT b.last_service_date INTO v_check_date
+    FROM buses b WHERE b.bus_id = v_bus_id;
+
+    IF v_check_date IS DISTINCT FROM v_orig_last_service THEN
+        RAISE EXCEPTION 'TEST 15 FAILED: Reversing to PENDING did not restore previous service date';
+    END IF;
+
+    -- Cleanup test record and audit entry
     DELETE FROM audit_logs WHERE table_name = 'maintenance_records' AND record_id = v_maint_id;
     DELETE FROM maintenance_records WHERE maintenance_id = v_maint_id;
 
-    RAISE NOTICE '[PASS] TEST 15: Maintenance audit logged and buses.last_service_date synchronized';
+    -- Verify deletion restores original state
+    SELECT b.last_service_date INTO v_check_date
+    FROM buses b WHERE b.bus_id = v_bus_id;
+
+    IF v_check_date IS DISTINCT FROM v_orig_last_service THEN
+        RAISE EXCEPTION 'TEST 15 FAILED: Deletion of test maintenance record did not preserve original service date';
+    END IF;
+
+    RAISE NOTICE '[PASS] TEST 15: Maintenance audit logged, date synced, reversed, and restored successfully';
 END;
 $$;
 

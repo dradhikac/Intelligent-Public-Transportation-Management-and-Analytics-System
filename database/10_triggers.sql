@@ -176,28 +176,52 @@ EXECUTE FUNCTION fn_auto_classify_delay();
 
 -- ---------------------------------------------------------------------
 -- FUNCTION: fn_sync_bus_maintenance_date
--- Purpose: Synchronize buses.last_service_date when a maintenance record
--- is marked as COMPLETED.
+-- Purpose: Synchronize buses.last_service_date based on the latest completed
+-- maintenance record. Safely handles completions, updates, reversals, and deletions.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_sync_bus_maintenance_date()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_bus_id BIGINT;
+    v_latest_completed_date DATE;
 BEGIN
-    -- Synchronize last_service_date on the bus when maintenance is completed
-    IF NEW.maintenance_status = 'COMPLETED' THEN
+    -- Determine target bus ID (handles INSERT, UPDATE, and DELETE)
+    v_bus_id := COALESCE(NEW.bus_id, OLD.bus_id);
+
+    -- Find the true latest completed maintenance date for this bus
+    SELECT MAX(mr.maintenance_date)
+    INTO v_latest_completed_date
+    FROM maintenance_records mr
+    WHERE mr.bus_id = v_bus_id
+      AND mr.maintenance_status = 'COMPLETED';
+
+    -- Update bus last_service_date to match the actual true latest completed date
+    UPDATE buses
+    SET last_service_date = v_latest_completed_date
+    WHERE bus_id = v_bus_id;
+
+    -- If bus_id was updated to a different bus, also sync the previous bus
+    IF TG_OP = 'UPDATE' AND OLD.bus_id IS DISTINCT FROM NEW.bus_id THEN
+        SELECT MAX(mr.maintenance_date)
+        INTO v_latest_completed_date
+        FROM maintenance_records mr
+        WHERE mr.bus_id = OLD.bus_id
+          AND mr.maintenance_status = 'COMPLETED';
+
         UPDATE buses
-        SET last_service_date = GREATEST(COALESCE(last_service_date, NEW.maintenance_date), NEW.maintenance_date)
-        WHERE bus_id = NEW.bus_id;
+        SET last_service_date = v_latest_completed_date
+        WHERE bus_id = OLD.bus_id;
     END IF;
 
-    RETURN NEW;
+    RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
 DROP TRIGGER IF EXISTS trg_sync_bus_maintenance_date ON maintenance_records;
 CREATE TRIGGER trg_sync_bus_maintenance_date
-AFTER INSERT OR UPDATE OF maintenance_status, maintenance_date ON maintenance_records
+AFTER INSERT OR UPDATE OF maintenance_status, maintenance_date, bus_id OR DELETE ON maintenance_records
 FOR EACH ROW
 EXECUTE FUNCTION fn_sync_bus_maintenance_date();
 
