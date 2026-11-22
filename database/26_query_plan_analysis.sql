@@ -183,17 +183,18 @@ ORDER BY delay_seconds DESC;
 
 -- =====================================================================
 -- QUERY 9: PASSENGER DEMAND VIEW (vw_passenger_demand)
--- Target: Complex 4-table join view with day-of-week and hourly extraction
+-- Target: 4-table join view with stop footfall metrics
 -- Access Method: View expansion with multi-table hash joins
 -- =====================================================================
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT
     route_number,
-    service_date,
+    stop_name,
     total_boardings,
-    total_alightings
+    total_alightings,
+    total_footfall
 FROM vw_passenger_demand
-ORDER BY service_date DESC, total_boardings DESC;
+ORDER BY total_footfall DESC;
 
 
 -- =====================================================================
