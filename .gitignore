@@ -37,3 +37,8 @@ yarn-error.log*
 *.sqlite3
 *.db
 *.tmp
+backups/
+*.dump
+*.tar
+*.bak
+*.sql.gz
